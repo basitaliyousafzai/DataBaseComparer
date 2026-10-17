@@ -49,68 +49,58 @@ public class CompareBackupCommand : AsyncCommand<CompareBackupCommand.Settings>
 
     public override async Task<int> ExecuteAsync(CommandContext context, Settings settings)
     {
-        RestoredDatabase? restored1 = null;
-        RestoredDatabase? restored2 = null;
-        try
+        await using var restored1 = await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .StartAsync($"Restoring backup: {settings.Backup1}", async _ =>
+                await BackupRestoreService.RestoreAsync(settings.Server, settings.Backup1));
+
+        await using var restored2 = await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .StartAsync($"Restoring backup: {settings.Backup2}", async _ =>
+                await BackupRestoreService.RestoreAsync(settings.Server, settings.Backup2));
+
+        var extractor = new UniversalSchemaExtractor();
+        var sourceSnapshot = await extractor.ExtractAsync(restored1.ConnectionString);
+        var targetSnapshot = await extractor.ExtractAsync(restored2.ConnectionString);
+
+        var differ = new SchemaDiffer();
+        var report = differ.Compare(sourceSnapshot, targetSnapshot, settings.Backup1, settings.Backup2);
+
+        var output = settings.Format.ToLowerInvariant() switch
         {
-            restored1 = await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .StartAsync($"Restoring backup: {settings.Backup1}", async _ =>
-                    await BackupRestoreService.RestoreAsync(settings.Server, settings.Backup1));
+            "json" => ReportFormatters.ToJson(report),
+            "junit" => ReportFormatters.ToJUnitXml(report),
+            "markdown" => ReportFormatters.ToMarkdown(report),
+            _ => null
+        };
 
-            restored2 = await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .StartAsync($"Restoring backup: {settings.Backup2}", async _ =>
-                    await BackupRestoreService.RestoreAsync(settings.Server, settings.Backup2));
-
-            var extractor = new UniversalSchemaExtractor();
-            var sourceSnapshot = await extractor.ExtractAsync(restored1.ConnectionString);
-            var targetSnapshot = await extractor.ExtractAsync(restored2.ConnectionString);
-
-            var differ = new SchemaDiffer();
-            var report = differ.Compare(sourceSnapshot, targetSnapshot, settings.Backup1, settings.Backup2);
-
-            var output = settings.Format.ToLowerInvariant() switch
+        if (output != null)
+        {
+            if (!string.IsNullOrWhiteSpace(settings.OutFile))
             {
-                "json" => ReportFormatters.ToJson(report),
-                "junit" => ReportFormatters.ToJUnitXml(report),
-                "markdown" => ReportFormatters.ToMarkdown(report),
-                _ => null
-            };
-
-            if (output != null)
-            {
-                if (!string.IsNullOrWhiteSpace(settings.OutFile))
-                {
-                    await File.WriteAllTextAsync(settings.OutFile, output);
-                    AnsiConsole.MarkupLine($"[green]✔ Report saved to:[/] {settings.OutFile}");
-                }
-                else
-                {
-                    Console.WriteLine(output);
-                }
+                await File.WriteAllTextAsync(settings.OutFile, output);
+                AnsiConsole.MarkupLine($"[green]✔ Report saved to:[/] {settings.OutFile}");
             }
             else
             {
-                ConsoleFormatter.PrintReport(report);
-                if (!string.IsNullOrWhiteSpace(settings.OutFile))
-                {
-                    var md = ReportFormatters.ToMarkdown(report);
-                    await File.WriteAllTextAsync(settings.OutFile, md);
-                    AnsiConsole.MarkupLine($"[green]✔ Markdown report saved to:[/] {settings.OutFile}");
-                }
+                Console.WriteLine(output);
             }
-
-            if (settings.FailOnBreaking && report.HasBreakingDrift)
-                return 1;
-            if (settings.FailOnDrift && report.HasDrift)
-                return 1;
-            return 0;
         }
-        finally
+        else
         {
-            restored2?.Dispose();
-            restored1?.Dispose();
+            ConsoleFormatter.PrintReport(report);
+            if (!string.IsNullOrWhiteSpace(settings.OutFile))
+            {
+                var md = ReportFormatters.ToMarkdown(report);
+                await File.WriteAllTextAsync(settings.OutFile, md);
+                AnsiConsole.MarkupLine($"[green]✔ Markdown report saved to:[/] {settings.OutFile}");
+            }
         }
+
+        if (settings.FailOnBreaking && report.HasBreakingDrift)
+            return 1;
+        if (settings.FailOnDrift && report.HasDrift)
+            return 1;
+        return 0;
     }
 }

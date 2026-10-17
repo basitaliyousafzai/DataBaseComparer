@@ -4,7 +4,7 @@ using SqlDrift.Core.Models;
 
 namespace SqlDrift.Core.Backup;
 
-public class RestoredDatabase : IDisposable
+public class RestoredDatabase : IAsyncDisposable, IDisposable
 {
     public string DatabaseName { get; }
     public string ConnectionString { get; }
@@ -18,18 +18,23 @@ public class RestoredDatabase : IDisposable
         _serverConnectionString = serverConnectionString;
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
         _disposed = true;
         try
         {
-            DropDatabaseAsync(_serverConnectionString, DatabaseName).GetAwaiter().GetResult();
+            await DropDatabaseAsync(_serverConnectionString, DatabaseName);
         }
         catch
         {
             // Best-effort cleanup
         }
+    }
+
+    public void Dispose()
+    {
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 
     public static async Task DropDatabaseAsync(string serverConnectionString, string databaseName, CancellationToken cancellationToken = default)
@@ -63,7 +68,7 @@ public static class BackupRestoreService
         if (!File.Exists(backupFilePath))
             throw new FileNotFoundException("Backup file not found.", backupFilePath);
 
-        var serverBuilder = new SqlConnectionStringBuilder(serverConnectionString) { InitialCatalog = "master" };
+        var serverBuilder = new SqlConnectionStringBuilder(serverConnectionString) { InitialCatalog = "master", ConnectTimeout = 5 };
 
         // Determine default data/log paths
         string dataPath;

@@ -106,10 +106,14 @@ public partial class MainWindow : Window
         try
         {
             var server = ServerTextBox.Text;
+            StatusText.Text = "Restoring source backup...";
             r1 = await BackupRestoreService.RestoreAsync(server, srcPath);
+            StatusText.Text = "Restoring target backup...";
             r2 = await BackupRestoreService.RestoreAsync(server, tgtPath);
 
+            StatusText.Text = "Extracting source schema and records...";
             _sourceSnapshot = await new UniversalSchemaExtractor().ExtractAsync(r1.ConnectionString);
+            StatusText.Text = "Extracting target schema and records...";
             _targetSnapshot = await new UniversalSchemaExtractor().ExtractAsync(r2.ConnectionString);
 
             _report = new SchemaDiffer().Compare(_sourceSnapshot, _targetSnapshot, srcPath, tgtPath);
@@ -131,8 +135,8 @@ public partial class MainWindow : Window
         }
         finally
         {
-            r2?.Dispose();
-            r1?.Dispose();
+            if (r2 != null) await r2.DisposeAsync();
+            if (r1 != null) await r1.DisposeAsync();
             ProgressBar.IsIndeterminate = false;
             ProgressBar.Visibility = Visibility.Collapsed;
             CompareButton.IsEnabled = true;
