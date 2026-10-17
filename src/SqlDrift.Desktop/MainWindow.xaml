@@ -2,18 +2,18 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SQLDrift — Backup Compare" Height="800" Width="1220"
-        Background="#0F172A" Foreground="#F1F5F9" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
+        Background="#F1F5F9" Foreground="#0F172A" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
     <Window.Resources>
-        <SolidColorBrush x:Key="BgBase" Color="#0F172A"/>
-        <SolidColorBrush x:Key="BgCard" Color="#1E293B"/>
-        <SolidColorBrush x:Key="BgInput" Color="#334155"/>
-        <SolidColorBrush x:Key="Border" Color="#475569"/>
-        <SolidColorBrush x:Key="TextPrimary" Color="#F1F5F9"/>
-        <SolidColorBrush x:Key="TextMuted" Color="#94A3B8"/>
-        <SolidColorBrush x:Key="Accent" Color="#3B82F6"/>
-        <SolidColorBrush x:Key="AccentHover" Color="#2563EB"/>
-        <SolidColorBrush x:Key="Success" Color="#10B981"/>
-        <SolidColorBrush x:Key="Danger" Color="#EF4444"/>
+        <SolidColorBrush x:Key="BgBase" Color="#F1F5F9"/>
+        <SolidColorBrush x:Key="BgCard" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="BgInput" Color="#E2E8F0"/>
+        <SolidColorBrush x:Key="Border" Color="#94A3B8"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#0F172A"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#475569"/>
+        <SolidColorBrush x:Key="Accent" Color="#2563EB"/>
+        <SolidColorBrush x:Key="AccentHover" Color="#1D4ED8"/>
+        <SolidColorBrush x:Key="Success" Color="#059669"/>
+        <SolidColorBrush x:Key="Danger" Color="#DC2626"/>
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="{StaticResource BgInput}"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
@@ -48,7 +48,7 @@
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
             <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
             <Setter Property="RowBackground" Value="{StaticResource BgCard}"/>
-            <Setter Property="AlternatingRowBackground" Value="#273549"/>
+            <Setter Property="AlternatingRowBackground" Value="#F8FAFC"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
             <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource Border}"/>
         </Style>
@@ -99,7 +99,7 @@
 
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
                     <Button x:Name="AddBackupsButton" Content="Attach .bak files" Click="AddBackups_Click" Margin="0,0,8,0" Background="{StaticResource Accent}"/>
-                    <Button x:Name="ClearBackupsButton" Content="Clear" Click="ClearBackups_Click" Background="{StaticResource BgInput}"/>
+                    <Button x:Name="ClearBackupsButton" Content="Clear" Click="ClearBackups_Click" Background="{StaticResource BgInput}" Foreground="{StaticResource TextPrimary}"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Text="Attached backups:" Foreground="{StaticResource TextMuted}" Margin="0,8,0,4"/>
@@ -158,7 +158,7 @@
                             </DataGrid>
                         </TabItem>
                         <TabItem Header="Script">
-                            <TextBox x:Name="ScriptTextBox" IsReadOnly="True" TextWrapping="NoWrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"/>
+                            <TextBox x:Name="ScriptTextBox" IsReadOnly="True" TextWrapping="NoWrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12" Background="{StaticResource BgInput}" Foreground="{StaticResource TextPrimary}"/>
                         </TabItem>
                     </TabControl>
 
