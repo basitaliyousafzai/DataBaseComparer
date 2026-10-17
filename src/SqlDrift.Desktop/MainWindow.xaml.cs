@@ -106,11 +106,11 @@ public partial class MainWindow : Window
         try
         {
             var server = ServerTextBox.Text;
-            r1 = await Task.Run(() => BackupRestoreService.RestoreAsync(server, srcPath).GetAwaiter().GetResult());
-            r2 = await Task.Run(() => BackupRestoreService.RestoreAsync(server, tgtPath).GetAwaiter().GetResult());
+            r1 = await BackupRestoreService.RestoreAsync(server, srcPath);
+            r2 = await BackupRestoreService.RestoreAsync(server, tgtPath);
 
-            _sourceSnapshot = await Task.Run(() => new UniversalSchemaExtractor().ExtractAsync(r1.ConnectionString).GetAwaiter().GetResult());
-            _targetSnapshot = await Task.Run(() => new UniversalSchemaExtractor().ExtractAsync(r2.ConnectionString).GetAwaiter().GetResult());
+            _sourceSnapshot = await new UniversalSchemaExtractor().ExtractAsync(r1.ConnectionString);
+            _targetSnapshot = await new UniversalSchemaExtractor().ExtractAsync(r2.ConnectionString);
 
             _report = new SchemaDiffer().Compare(_sourceSnapshot, _targetSnapshot, srcPath, tgtPath);
 
