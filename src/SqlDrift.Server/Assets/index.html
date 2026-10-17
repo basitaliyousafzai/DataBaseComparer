@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQLDrift — Schema Drift & Safe Migration Inspector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #090d16;
+            --bg-surface: #111827;
+            --bg-elevated: #1f293d;
+            --bg-hover: #2a374f;
+            --border-subtle: #233148;
+            --border-strong: #374763;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --primary: #38bdf8;
+            --primary-glow: rgba(56, 189, 248, 0.25);
+            --accent: #818cf8;
+            --success: #34d399;
+            --success-glow: rgba(52, 211, 153, 0.2);
+            --warning: #fbbf24;
+            --warning-glow: rgba(251, 191, 36, 0.2);
+            --danger: #f87171;
+            --danger-glow: rgba(248, 113, 113, 0.25);
+            --diff-add-bg: rgba(52, 211, 153, 0.15);
+            --diff-add-text: #a7f3d0;
+            --diff-del-bg: rgba(248, 113, 113, 0.15);
+            --diff-del-text: #fecaca;
+            --diff-mod-bg: rgba(251, 191, 36, 0.15);
+            --diff-mod-text: #fef08a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Top Bar */
+        header {
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0.85rem 1.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .brand-logo {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #0284c7, #6366f1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.15rem;
+            color: #fff;
+            box-shadow: 0 0 16px var(--primary-glow);
+        }
+
+        .brand-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .target-endpoints {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.85rem;
+            background: var(--bg-elevated);
+            padding: 0.4rem 0.9rem;
+            border-radius: 9999px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .endpoint-chip {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .endpoint-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .endpoint-dot.source { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
+        .endpoint-dot.target { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0284c7, #4f46e5);
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(2, 132, 199, 0.35);
+        }
+
+        .btn-primary:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45);
+        }
+
+        .btn-secondary {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border-color: var(--border-strong);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Metrics Bar */
+        .metrics-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            padding: 1.25rem 1.75rem 0.75rem;
+        }
+
+        .metric-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 1rem 1.2rem;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .metric-card.total::before { background: var(--primary); }
+        .metric-card.breaking::before { background: var(--danger); }
+        .metric-card.medium::before { background: var(--warning); }
+        .metric-card.low::before { background: var(--success); }
+
+        .metric-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .metric-value {
+            font-size: 1.85rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .metric-card.breaking .metric-value { color: var(--danger); text-shadow: 0 0 12px var(--danger-glow); }
+        .metric-card.medium .metric-value { color: var(--warning); }
+        .metric-card.low .metric-value { color: var(--success); }
+        .metric-card.total .metric-value { color: var(--primary); }
+
+        /* Filter Controls */
+        .controls-bar {
+            padding: 0.75rem 1.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            max-width: 360px;
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 0.5rem 0.85rem 0.5rem 2.2rem;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary-glow);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .chip {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .chip:hover, .chip.active {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--border-strong);
+        }
+
+        .chip.active {
+            border-color: var(--primary);
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--primary);
+        }
+
+        /* Workspace Grid */
+        .workspace {
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            flex: 1;
+            height: calc(100vh - 220px);
+            min-height: 480px;
+        }
+
+        /* Left Panel - Tree / List */
+        .tree-panel {
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border-subtle);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 0.75rem 1.25rem;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .drift-item {
+            padding: 0.85rem 1.25rem;
+            border-bottom: 1px solid var(--border-subtle);
+            cursor: pointer;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            transition: background 0.15s;
+        }
+
+        .drift-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .drift-item.selected {
+            background: rgba(56, 189, 248, 0.12);
+            border-left: 3px solid var(--primary);
+        }
+
+        .item-checkbox {
+            margin-top: 0.25rem;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .item-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .item-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .item-name {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .badges {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-shrink: 0;
+        }
+
+        .badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .badge.breaking { background: var(--danger-glow); color: var(--danger); border: 1px solid var(--danger); }
+        .badge.medium { background: var(--warning-glow); color: var(--warning); border: 1px solid var(--warning); }
+        .badge.low { background: var(--success-glow); color: var(--success); border: 1px solid var(--success); }
+
+        .badge.added { background: rgba(52, 211, 153, 0.2); color: var(--success); }
+        .badge.missing { background: rgba(248, 113, 113, 0.2); color: var(--danger); }
+        .badge.modified { background: rgba(251, 191, 36, 0.2); color: var(--warning); }
+
+        .item-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.35;
+        }
+
+        /* Right Panel - Diff Inspector */
+        .diff-panel {
+            background: var(--bg-base);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .diff-header {
+            padding: 1rem 1.5rem;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .diff-title-group h2 {
+            font-family: 'Fira Code', monospace;
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .diff-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .diff-view-mode {
+            display: flex;
+            background: var(--bg-elevated);
+            border-radius: 6px;
+            padding: 2px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .diff-view-mode button {
+            padding: 0.35rem 0.75rem;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .diff-view-mode button.active {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .diff-container {
+            flex: 1;
+            padding: 1.5rem;
+            overflow: auto;
+        }
+
+        .side-by-side {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+        }
+
+        .diff-pane {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .diff-pane-title {
+            background: var(--bg-elevated);
+            padding: 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .diff-lines {
+            padding: 0.5rem 0;
+            line-height: 1.5;
+            max-height: 520px;
+            overflow-y: auto;
+        }
+
+        .diff-line {
+            display: flex;
+            padding: 0.1rem 0.5rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .diff-line-num {
+            width: 38px;
+            color: var(--text-muted);
+            text-align: right;
+            padding-right: 0.75rem;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .diff-line-content {
+            flex: 1;
+        }
+
+        .diff-line.added { background: var(--diff-add-bg); color: var(--diff-add-text); }
+        .diff-line.deleted { background: var(--diff-del-bg); color: var(--diff-del-text); }
+        .diff-line.modified { background: var(--diff-mod-bg); color: var(--diff-mod-text); }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-strong);
+            border-radius: 14px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .script-preview {
+            background: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            max-height: 480px;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-subtle);
+            background: var(--bg-elevated);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .options-row {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            font-size: 0.85rem;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="brand-logo">Δ</div>
+            <div>
+                <div class="brand-title">SQLDrift</div>
+                <div class="brand-subtitle">Schema Drift & Migration Inspector</div>
+            </div>
+        </div>
+
+        <div class="target-endpoints">
+            <div class="endpoint-chip">
+                <span class="endpoint-dot source"></span>
+                <span style="color: var(--text-muted);">Source:</span>
+                <strong id="src-name">...</strong>
+            </div>
+            <span style="color: var(--text-muted);">⟶</span>
+            <div class="endpoint-chip">
+                <span class="endpoint-dot target"></span>
+                <span style="color: var(--text-muted);">Target:</span>
+                <strong id="tgt-name">...</strong>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="exportReportJson()">Export JSON</button>
+            <button class="btn btn-primary" onclick="openScriptModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                Generate Migration Script
+            </button>
+        </div>
+    </header>
+
+    <div class="metrics-bar">
+        <div class="metric-card total">
+            <div class="metric-label">Total Drifts</div>
+            <div class="metric-value" id="m-total">0</div>
+        </div>
+        <div class="metric-card breaking">
+            <div class="metric-label">Breaking / Data Loss</div>
+            <div class="metric-value" id="m-breaking">0</div>
+        </div>
+        <div class="metric-card medium">
+            <div class="metric-label">Medium Severity</div>
+            <div class="metric-value" id="m-medium">0</div>
+        </div>
+        <div class="metric-card low">
+            <div class="metric-label">Safe Additions (Low)</div>
+            <div class="metric-value" id="m-low">0</div>
+        </div>
+    </div>
+
+    <div class="controls-bar">
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="search-input" placeholder="Search tables, procedures, views..." oninput="filterDrifts()">
+        </div>
+
+        <div class="filter-group">
+            <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.25rem;">Severity:</span>
+            <div class="chip active" data-filter="sev" data-val="all" onclick="setFilter('sev', 'all', this)">All</div>
+            <div class="chip" data-filter="sev" data-val="breaking" onclick="setFilter('sev', 'breaking', this)">🚨 Breaking</div>
+            <div class="chip" data-filter="sev" data-val="medium" onclick="setFilter('sev', 'medium', this)">⚠️ Medium</div>
+            <div class="chip" data-filter="sev" data-val="low" onclick="setFilter('sev', 'low', this)">ℹ️ Low</div>
+        </div>
+
+        <div class="filter-group">
+            <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.25rem;">Type:</span>
+            <div class="chip active" data-filter="type" data-val="all" onclick="setFilter('type', 'all', this)">All</div>
+            <div class="chip" data-filter="type" data-val="Table" onclick="setFilter('type', 'Table', this)">Tables</div>
+            <div class="chip" data-filter="type" data-val="StoredProcedure" onclick="setFilter('type', 'StoredProcedure', this)">Procs</div>
+            <div class="chip" data-filter="type" data-val="View" onclick="setFilter('type', 'View', this)">Views</div>
+            <div class="chip" data-filter="type" data-val="UserDefinedFunction" onclick="setFilter('type', 'UserDefinedFunction', this)">Functions</div>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <!-- Left Panel: Drift List -->
+        <div class="tree-panel">
+            <div class="panel-header">
+                <div>
+                    <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this.checked)" checked style="vertical-align: middle; margin-right: 6px;">
+                    <span id="drift-count-label">Drifts</span>
+                </div>
+                <a href="javascript:void(0)" onclick="deselectBreaking()" style="color: var(--text-secondary); text-decoration: none;">Deselect Breaking</a>
+            </div>
+            <div id="drift-items-container">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Right Panel: Diff Inspector -->
+        <div class="diff-panel">
+            <div class="diff-header" id="diff-header">
+                <div class="diff-title-group">
+                    <h2 id="diff-selected-name">Select an object to inspect</h2>
+                    <div class="diff-subtitle" id="diff-selected-desc">Side-by-side AST and semantic comparison</div>
+                </div>
+            </div>
+
+            <div class="diff-container" id="diff-container">
+                <div class="empty-state">
+                    <div class="empty-icon">📊</div>
+                    <h3>No Object Selected</h3>
+                    <p style="margin-top: 0.5rem;">Select any drifted table, column, or procedure on the left to inspect its side-by-side DDL diff.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Modal -->
+    <div class="modal-overlay" id="script-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Idempotent T-SQL Migration Script</h3>
+                <button class="btn btn-secondary" onclick="closeScriptModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <pre class="script-preview" id="script-preview">Generating safe migration script...</pre>
+            </div>
+            <div class="modal-footer">
+                <div class="options-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="modal-allow-data-loss" onchange="refreshGeneratedScript()">
+                        Allow Data Loss (--allow-data-loss)
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="modal-wrap-tx" checked onchange="refreshGeneratedScript()">
+                        Wrap in Transaction
+                    </label>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-secondary" onclick="copyScript()">Copy Script</button>
+                    <button class="btn btn-primary" onclick="downloadScript()">Download .sql</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let reportData = null;
+        let selectedDrift = null;
+        let selectedItems = new Set();
+        let currentFilters = { sev: 'all', type: 'all', search: '' };
+
+        async function init() {
+            try {
+                const res = await fetch('/api/report');
+                reportData = await res.json();
+                renderReport();
+            } catch (err) {
+                console.error("Failed to load drift report:", err);
+            }
+        }
+
+        function renderReport() {
+            if (!reportData) return;
+
+            document.getElementById('src-name').textContent = reportData.sourceIdentifier;
+            document.getElementById('tgt-name').textContent = reportData.targetIdentifier;
+
+            document.getElementById('m-total').textContent = reportData.totalDrifts;
+            document.getElementById('m-breaking').textContent = reportData.breakingCount;
+            document.getElementById('m-medium').textContent = reportData.mediumCount;
+            document.getElementById('m-low').textContent = reportData.lowCount;
+
+            reportData.drifts.forEach((d, idx) => selectedItems.add(idx));
+
+            renderDriftList();
+        }
+
+        function renderDriftList() {
+            const container = document.getElementById('drift-items-container');
+            container.innerHTML = '';
+
+            const filtered = reportData.drifts.map((d, idx) => ({ drift: d, originalIndex: idx })).filter(item => {
+                const d = item.drift;
+                if (currentFilters.sev !== 'all' && d.severity.toLowerCase() !== currentFilters.sev) return false;
+                if (currentFilters.type !== 'all' && d.objectType !== currentFilters.type) return false;
+                if (currentFilters.search) {
+                    const q = currentFilters.search.toLowerCase();
+                    const match = d.name.toLowerCase().includes(q) || d.schema.toLowerCase().includes(q) || d.description.toLowerCase().includes(q);
+                    if (!match) return false;
+                }
+                return true;
+            });
+
+            document.getElementById('drift-count-label').textContent = `${filtered.length} Objects`;
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No matching objects found.</p></div>';
+                return;
+            }
+
+            filtered.forEach(item => {
+                const d = item.drift;
+                const idx = item.originalIndex;
+
+                const div = document.createElement('div');
+                div.className = 'drift-item' + (selectedDrift === idx ? ' selected' : '');
+                div.onclick = (e) => {
+                    if (e.target.tagName !== 'INPUT') selectDrift(idx);
+                };
+
+                const isChecked = selectedItems.has(idx);
+
+                div.innerHTML = `
+                    <input type="checkbox" class="item-checkbox" ${isChecked ? 'checked' : ''} onchange="toggleItemSelection(${idx}, this.checked)">
+                    <div class="item-body">
+                        <div class="item-top">
+                            <span class="item-name" title="${d.fullName}">${d.fullName}</span>
+                            <div class="badges">
+                                <span class="badge ${d.driftType.toLowerCase()}">${d.driftType}</span>
+                                <span class="badge ${d.severity.toLowerCase()}">${d.severity}</span>
+                            </div>
+                        </div>
+                        <div class="item-desc">${escapeHtml(d.description)}</div>
+                    </div>
+                `;
+
+                container.appendChild(div);
+            });
+
+            if (selectedDrift === null && filtered.length > 0) {
+                selectDrift(filtered[0].originalIndex);
+            }
+        }
+
+        function selectDrift(idx) {
+            selectedDrift = idx;
+            document.querySelectorAll('.drift-item').forEach(el => el.classList.remove('selected'));
+            renderDriftList();
+
+            const d = reportData.drifts[idx];
+            document.getElementById('diff-selected-name').textContent = d.fullName;
+            document.getElementById('diff-selected-desc').textContent = `${d.objectType} — ${d.description}`;
+
+            renderDiffViewer(d);
+        }
+
+        function renderDiffViewer(d) {
+            const container = document.getElementById('diff-container');
+            const srcDef = d.sourceDefinition || '-- (Not present in source)';
+            const tgtDef = d.targetDefinition || '-- (Not present in target)';
+
+            const srcLines = srcDef.split('\n');
+            const tgtLines = tgtDef.split('\n');
+            const maxLines = Math.max(srcLines.length, tgtLines.length);
+
+            let tgtLinesHtml = '';
+            let srcLinesHtml = '';
+
+            for (let i = 0; i < maxLines; i++) {
+                const sLine = i < srcLines.length ? srcLines[i] : '';
+                const tLine = i < tgtLines.length ? tgtLines[i] : '';
+
+                let sClass = '';
+                let tClass = '';
+
+                if (i >= srcLines.length) {
+                    tClass = 'deleted';
+                } else if (i >= tgtLines.length) {
+                    sClass = 'added';
+                } else if (sLine.trim() !== tLine.trim()) {
+                    sClass = 'modified';
+                    tClass = 'modified';
+                }
+
+                tgtLinesHtml += `<div class="diff-line ${tClass}"><span class="diff-line-num">${i < tgtLines.length ? i + 1 : ''}</span><span class="diff-line-content">${escapeHtml(tLine)}</span></div>`;
+                srcLinesHtml += `<div class="diff-line ${sClass}"><span class="diff-line-num">${i < srcLines.length ? i + 1 : ''}</span><span class="diff-line-content">${escapeHtml(sLine)}</span></div>`;
+            }
+
+            container.innerHTML = `
+                <div class="side-by-side">
+                    <div class="diff-pane">
+                        <div class="diff-pane-title">
+                            <span>TARGET (Current Live DB)</span>
+                            <span>${tgtLines.length} lines</span>
+                        </div>
+                        <div class="diff-lines">${tgtLinesHtml}</div>
+                    </div>
+                    <div class="diff-pane">
+                        <div class="diff-pane-title">
+                            <span>SOURCE (Desired Schema)</span>
+                            <span>${srcLines.length} lines</span>
+                        </div>
+                        <div class="diff-lines">${srcLinesHtml}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleItemSelection(idx, checked) {
+            if (checked) selectedItems.add(idx);
+            else selectedItems.delete(idx);
+        }
+
+        function toggleSelectAll(checked) {
+            if (checked) {
+                reportData.drifts.forEach((_, idx) => selectedItems.add(idx));
+            } else {
+                selectedItems.clear();
+            }
+            renderDriftList();
+        }
+
+        function deselectBreaking() {
+            reportData.drifts.forEach((d, idx) => {
+                if (d.severity === 'Breaking') selectedItems.delete(idx);
+            });
+            renderDriftList();
+        }
+
+        function setFilter(type, val, elem) {
+            currentFilters[type] = val;
+            document.querySelectorAll(`[data-filter="${type}"]`).forEach(el => el.classList.remove('active'));
+            elem.classList.add('active');
+            renderDriftList();
+        }
+
+        function filterDrifts() {
+            currentFilters.search = document.getElementById('search-input').value.trim();
+            renderDriftList();
+        }
+
+        async function openScriptModal() {
+            document.getElementById('script-modal').classList.add('open');
+            await refreshGeneratedScript();
+        }
+
+        function closeScriptModal() {
+            document.getElementById('script-modal').classList.remove('open');
+        }
+
+        async function refreshGeneratedScript() {
+            const preview = document.getElementById('script-preview');
+            preview.textContent = 'Generating script...';
+
+            const allowDataLoss = document.getElementById('modal-allow-data-loss').checked;
+            const wrapTx = document.getElementById('modal-wrap-tx').checked;
+
+            try {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        selectedIndices: Array.from(selectedItems),
+                        allowDataLoss: allowDataLoss,
+                        wrapInTransaction: wrapTx
+                    })
+                });
+                const data = await res.json();
+                preview.textContent = data.script;
+            } catch (err) {
+                preview.textContent = '-- Error generating script: ' + err;
+            }
+        }
+
+        function copyScript() {
+            const text = document.getElementById('script-preview').textContent;
+            navigator.clipboard.writeText(text);
+            alert('Migration script copied to clipboard!');
+        }
+
+        function downloadScript() {
+            const text = document.getElementById('script-preview').textContent;
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sqldrift_migration_${new Date().toISOString().replace(/[:.]/g, '-')}.sql`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportReportJson() {
+            const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sqldrift_report_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

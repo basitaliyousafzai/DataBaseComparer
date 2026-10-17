@@ -1,0 +1,117 @@
+﻿<Window x:Class="SqlDrift.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SQLDrift — Backup Compare" Height="780" Width="1180"
+        Background="#090D16" Foreground="#F8FAFC" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#111827" CornerRadius="12" Padding="16" Margin="0,0,0,12" BorderBrush="#233148" BorderThickness="1">
+            <StackPanel>
+                <TextBlock Text="SQLDrift Backup Compare" FontSize="22" FontWeight="Bold" Foreground="#38BDF8"/>
+                <TextBlock Text="Attach two or more .bak backups of the same database, restore them to a temporary SQL Server, and compare schema drift." Foreground="#94A3B8" Margin="0,4,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Connection + file attach -->
+        <Border Grid.Row="1" Background="#111827" CornerRadius="12" Padding="16" Margin="0,0,0,12" BorderBrush="#233148" BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="SQL Server instance connection string" Foreground="#94A3B8" Margin="0,0,0,4"/>
+                <TextBox Grid.Row="1" Grid.Column="0" x:Name="ServerTextBox" Text="Server=localhost;Integrated Security=true;TrustServerCertificate=true;" Background="#1F293D" Foreground="#F8FAFC" BorderBrush="#374763" Padding="8" Margin="0,0,8,0"/>
+
+                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <Button x:Name="AddBackupsButton" Content="Attach .bak files" Click="AddBackups_Click" Padding="12,8" Margin="0,0,8,0" Background="#0284C7" Foreground="White" BorderThickness="0"/>
+                    <Button x:Name="ClearBackupsButton" Content="Clear" Click="ClearBackups_Click" Padding="12,8" Background="#2A374F" Foreground="White" BorderThickness="0"/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Text="Attached backups:" Foreground="#94A3B8" Margin="0,8,0,4"/>
+            </Grid>
+        </Border>
+
+        <!-- Main workspace -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Attached list -->
+            <Border Grid.Column="0" Background="#111827" CornerRadius="12" Padding="12" Margin="0,0,12,0" BorderBrush="#233148" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ListBox x:Name="BackupsListBox" Background="#0F172A" Foreground="#F8FAFC" BorderThickness="0" Margin="0,0,0,8"/>
+                    <StackPanel Grid.Row="1">
+                        <TextBlock Text="Source backup:" Foreground="#94A3B8" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="SourceCombo" Margin="0,0,0,8" Background="#1F293D" Foreground="#F8FAFC"/>
+                        <TextBlock Text="Target backup:" Foreground="#94A3B8" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="TargetCombo" Margin="0,0,0,8" Background="#1F293D" Foreground="#F8FAFC"/>
+                        <Button x:Name="CompareButton" Content="Compare Backups" Click="Compare_Click" Padding="12,10" Background="#4F46E5" Foreground="White" BorderThickness="0" FontWeight="Bold"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Results -->
+            <Border Grid.Column="1" Background="#111827" CornerRadius="12" Padding="12" BorderBrush="#233148" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock x:Name="SummaryText" Text="No comparison yet." Foreground="#F8FAFC" FontSize="14" FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <ProgressBar x:Name="ProgressBar" Grid.Row="1" Height="4" IsIndeterminate="False" Visibility="Collapsed" Margin="0,0,0,8" Background="#1F293D" Foreground="#38BDF8"/>
+
+                    <TabControl Grid.Row="2" Background="#0F172A" BorderThickness="0">
+                        <TabItem Header="Drifts" Background="#1F293D" Foreground="#F8FAFC">
+                            <DataGrid x:Name="DriftsGrid" AutoGenerateColumns="False" IsReadOnly="True" Background="#0F172A" Foreground="#F8FAFC" BorderThickness="0" RowBackground="#111827" AlternatingRowBackground="#1A2236">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Type" Binding="{Binding ObjectType}" Width="120"/>
+                                    <DataGridTextColumn Header="Object" Binding="{Binding FullName}" Width="220"/>
+                                    <DataGridTextColumn Header="Drift" Binding="{Binding DriftType}" Width="90"/>
+                                    <DataGridTextColumn Header="Severity" Binding="{Binding Severity}" Width="90"/>
+                                    <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem Header="Script" Background="#1F293D" Foreground="#F8FAFC">
+                            <TextBox x:Name="ScriptTextBox" IsReadOnly="True" TextWrapping="NoWrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Background="#0F172A" Foreground="#E2E8F0" FontFamily="Consolas" FontSize="12"/>
+                        </TabItem>
+                    </TabControl>
+
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                        <Button x:Name="GenerateScriptButton" Content="Generate Migration Script" Click="GenerateScript_Click" Padding="12,8" Background="#059669" Foreground="White" BorderThickness="0" IsEnabled="False"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="3" Background="#111827" CornerRadius="8" Padding="10" Margin="0,12,0,0" BorderBrush="#233148" BorderThickness="1">
+            <TextBlock x:Name="StatusText" Text="Ready." Foreground="#94A3B8"/>
+        </Border>
+    </Grid>
+</Window>

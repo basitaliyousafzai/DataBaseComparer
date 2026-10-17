@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SqlDrift.Cli/SqlDrift.Cli.csproj" />
+    <Project Path="src/SqlDrift.Core/SqlDrift.Core.csproj" />
+    <Project Path="src/SqlDrift.Desktop/SqlDrift.Desktop.csproj" />
+    <Project Path="src/SqlDrift.Server/SqlDrift.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SqlDrift.Core.Tests/SqlDrift.Core.Tests.csproj" />
+  </Folder>
+</Solution>
