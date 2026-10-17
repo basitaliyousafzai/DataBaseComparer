@@ -1,8 +1,9 @@
 ﻿<Window x:Class="SqlDrift.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SQLDrift — Backup Compare" Height="800" Width="1220"
-        Background="#F1F5F9" Foreground="#0F172A" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
+        Title="SQLDrift — Backup Compare" Height="860" Width="1320"
+        Background="#F1F5F9" Foreground="#0F172A" FontFamily="Segoe UI" WindowStartupLocation="CenterScreen"
+        Closing="Window_Closing">
     <Window.Resources>
         <SolidColorBrush x:Key="BgBase" Color="#F1F5F9"/>
         <SolidColorBrush x:Key="BgCard" Color="#FFFFFF"/>
@@ -11,9 +12,10 @@
         <SolidColorBrush x:Key="TextPrimary" Color="#0F172A"/>
         <SolidColorBrush x:Key="TextMuted" Color="#475569"/>
         <SolidColorBrush x:Key="Accent" Color="#2563EB"/>
-        <SolidColorBrush x:Key="AccentHover" Color="#1D4ED8"/>
         <SolidColorBrush x:Key="Success" Color="#059669"/>
-        <SolidColorBrush x:Key="Danger" Color="#DC2626"/>
+        <SolidColorBrush x:Key="DiffAdd" Color="#DCFCE7"/>
+        <SolidColorBrush x:Key="DiffDel" Color="#FEE2E2"/>
+        <SolidColorBrush x:Key="DiffMod" Color="#FEF9C3"/>
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="{StaticResource BgInput}"/>
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
@@ -77,7 +79,7 @@
         <Border Grid.Row="0" Background="{StaticResource BgCard}" CornerRadius="12" Padding="18" Margin="0,0,0,12" BorderBrush="{StaticResource Border}" BorderThickness="1">
             <StackPanel>
                 <TextBlock Text="SQLDrift Backup Compare" FontSize="24" FontWeight="Bold" Foreground="{StaticResource Accent}"/>
-                <TextBlock Text="Attach .bak backups of the same database, compare schema + data + views + stored procedures, and generate safe migration scripts." Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" FontSize="13"/>
+                <TextBlock Text="Attach .bak backups of the same database, compare schema + data + views + stored procedures, and inspect row/line-level differences." Foreground="{StaticResource TextMuted}" Margin="0,4,0,0" FontSize="13"/>
             </StackPanel>
         </Border>
 
@@ -147,7 +149,7 @@
 
                     <TabControl Grid.Row="2" Background="{StaticResource BgCard}" BorderThickness="0">
                         <TabItem Header="Drifts">
-                            <DataGrid x:Name="DriftsGrid" AutoGenerateColumns="False" IsReadOnly="True">
+                            <DataGrid x:Name="DriftsGrid" AutoGenerateColumns="False" IsReadOnly="True" SelectionChanged="DriftsGrid_SelectionChanged">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Type" Binding="{Binding ObjectType}" Width="110"/>
                                     <DataGridTextColumn Header="Object" Binding="{Binding FullName}" Width="200"/>
@@ -156,6 +158,49 @@
                                     <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*"/>
                                 </DataGrid.Columns>
                             </DataGrid>
+                        </TabItem>
+                        <TabItem Header="Details">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock x:Name="DetailTitle" Text="Select a drifted object to inspect details." Foreground="{StaticResource TextMuted}" Margin="0,0,0,8" FontWeight="SemiBold"/>
+                                <Grid x:Name="TableDetailPanel" Grid.Row="1" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Margin="0,0,6,0" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="8" Background="{StaticResource BgCard}">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="Source" FontWeight="Bold" Margin="8" Foreground="{StaticResource Accent}"/>
+                                            <DataGrid x:Name="SourceDataGrid" Grid.Row="1" AutoGenerateColumns="True" IsReadOnly="True" LoadingRow="SourceDataGrid_LoadingRow"/>
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Column="1" Margin="6,0,0,0" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="8" Background="{StaticResource BgCard}">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="Target" FontWeight="Bold" Margin="8" Foreground="{StaticResource Accent}"/>
+                                            <DataGrid x:Name="TargetDataGrid" Grid.Row="1" AutoGenerateColumns="True" IsReadOnly="True" LoadingRow="TargetDataGrid_LoadingRow"/>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                                <DataGrid x:Name="TextDiffGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True" Visibility="Collapsed" LoadingRow="TextDiffGrid_LoadingRow">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Line" Binding="{Binding LineNumber}" Width="60"/>
+                                        <DataGridTextColumn Header="Source" Binding="{Binding SourceLine}" Width="*"/>
+                                        <DataGridTextColumn Header="Target" Binding="{Binding TargetLine}" Width="*"/>
+                                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="90"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
                         </TabItem>
                         <TabItem Header="Script">
                             <TextBox x:Name="ScriptTextBox" IsReadOnly="True" TextWrapping="NoWrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12" Background="{StaticResource BgInput}" Foreground="{StaticResource TextPrimary}"/>
